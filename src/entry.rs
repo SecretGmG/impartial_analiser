@@ -8,7 +8,7 @@ where
 {
     game: G,
     possible_nimbers: Vec<u16>,
-    move_indices: Option<Vec<Vec<usize>>>,
+    unprocessed_move_indices: Option<Vec<Vec<usize>>>,
 }
 
 impl<G> Entry<G>
@@ -19,7 +19,7 @@ where
         Entry {
             possible_nimbers : game.get_possible_nimbers(),
             game: game,
-            move_indices: None,
+            unprocessed_move_indices: None,
         }
     }
     pub fn get_nimber(&self) -> Option<u16>{
@@ -42,11 +42,17 @@ where
     pub fn get_smallest_possible_nimber(&self) -> u16{
         self.possible_nimbers[0]
     }
-    pub fn get_move_indices(&self) -> Option<&Vec<Vec<usize>>> {
-        self.move_indices.as_ref()
+    pub fn get_next_unprocessed_move_index(&mut self) -> Option<Vec<usize>> {
+        self.unprocessed_move_indices.as_mut().expect("the move indices should already be generated").pop()
     }
-    pub fn set_child_indices(&mut self, child_indices: Vec<Vec<usize>>) {
-        self.move_indices = Some(child_indices);
+    pub fn add_unprocessed_move_indices(&mut self, mut new_unprocessed_move_indices: Vec<Vec<usize>>){
+        self.unprocessed_move_indices.as_mut().expect("the move indices should already be generated").append(&mut new_unprocessed_move_indices);
+    }
+    pub fn are_move_indices_generated(&self) -> bool{
+        return self.unprocessed_move_indices.is_some();
+    }
+    pub fn set_child_indices(&mut self, unprocessed_move_indices: Vec<Vec<usize>>) {
+        self.unprocessed_move_indices = Some(unprocessed_move_indices);
     }
     pub fn get_unique_moves(&self) -> Vec<G> {
         self.game.get_unique_moves()

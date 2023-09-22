@@ -65,10 +65,9 @@ where
                         return;
                     }
                 }
-                //since the move was not fully prcessed we need to add it back to the unprocessed moves
+                //since the move was not fully prcessed we need to add it back to the unprocessed moves later
                 None => {
                     still_unprocessed_move_indices.push(move_indices);
-                    //self.data[index].add_unprocessed_move_index(move_indices)
                 },
             }
         }

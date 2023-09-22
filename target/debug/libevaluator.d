@@ -1,0 +1,1 @@
+C:\Users\cedri\Documents\repos\impartial_analiser\target\debug\libevaluator.rlib: C:\Users\cedri\Documents\repos\impartial_analiser\src\entry.rs C:\Users\cedri\Documents\repos\impartial_analiser\src\lib.rs C:\Users\cedri\Documents\repos\impartial_analiser\src\tests.rs

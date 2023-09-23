@@ -61,14 +61,14 @@ fn test_aperiodic_kayles_nimbers() {
         assert_eq!(
             nimbers[i],
             eval.get_nimber(Kayles {
-                kayles: vec![i as usize]
+                kayles: vec![i]
             })
         );
     }
 }
 #[test]
 fn test_bound_creation_for_last_part_calculations() {
-    for bound in 0..10 as usize {
+    for bound in 0..10 {
         for modifier in 0..(5 * bound) {
             let mut detected_nimbers = vec![];
             for i in 0..=(bound + modifier) {

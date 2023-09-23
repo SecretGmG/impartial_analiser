@@ -5,7 +5,7 @@ use crate::{Evaluator, Impartial};
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 struct Kayles {
-    kayles: Vec<u16>,
+    kayles: Vec<usize>,
 }
 
 impl Impartial<Kayles> for Kayles {
@@ -17,7 +17,7 @@ impl Impartial<Kayles> for Kayles {
             .collect();
     }
 
-    fn get_max_nimber(&self) -> u16 {
+    fn get_max_nimber(&self) -> usize {
         return self.kayles.iter().sum();
     }
 
@@ -49,7 +49,7 @@ impl Impartial<Kayles> for Kayles {
 
 #[test]
 fn test_aperiodic_kayles_nimbers() {
-    let nimbers: Vec<u16> = vec![
+    let nimbers: Vec<usize> = vec![
         0, 1, 2, 3, 1, 4, 3, 2, 1, 4, 2, 6, 4, 1, 2, 7, 1, 4, 3, 2, 1, 4, 6, 7, 4, 1, 2, 8, 5, 4,
         7, 2, 1, 8, 6, 7, 4, 1, 2, 3, 1, 4, 7, 2, 1, 8, 2, 7, 4, 1, 2, 8, 1, 4, 7, 2, 1, 4, 2, 7,
         4, 1, 2, 8, 1, 4, 7, 2, 1, 8, 6, 7, 4, 1, 2, 8, 1, 4, 7, 2, 1, 8, 2, 7, 4, 1, 2, 8, 1, 4,
@@ -61,7 +61,7 @@ fn test_aperiodic_kayles_nimbers() {
         assert_eq!(
             nimbers[i],
             eval.get_nimber(Kayles {
-                kayles: vec![i as u16]
+                kayles: vec![i as usize]
             })
         );
     }

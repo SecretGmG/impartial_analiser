@@ -11,8 +11,8 @@ where
     G: Impartial<G>,
 {
     fn get_parts(self) -> Vec<G>;
-    fn get_max_nimber(&self) -> u16;
-    fn get_possible_nimbers(&self) -> Vec<u16> {
+    fn get_max_nimber(&self) -> usize;
+    fn get_possible_nimbers(&self) -> Vec<usize> {
         (0..=self.get_max_nimber()).collect()
     }
     fn get_unique_moves(&self) -> Vec<G>;
@@ -41,12 +41,12 @@ where
         }
     }
     /// calculates the nimber of an impartial game
-    pub fn get_nimber(&mut self, g: G) -> u16 {
-        return self.get_bounded_nimber(g, u16::max_value()).unwrap();
+    pub fn get_nimber(&mut self, g: G) -> usize {
+        return self.get_bounded_nimber(g, usize::max_value()).unwrap();
     }
     /// calculates the nimber of an impartial game but stoppes if the evaluator
     /// is certain that the nimber of the game is above the bound
-    pub fn get_bounded_nimber(&mut self, g: G, bound: u16) -> Option<u16> {
+    pub fn get_bounded_nimber(&mut self, g: G, bound: usize) -> Option<usize> {
         let parts_indices = self.get_part_indices(g);
         return self.get_bounded_nimber_by_parts(&parts_indices, bound);
     }
@@ -74,7 +74,7 @@ where
         self.data[index].set_nimber(nimber);
     }
     /// gets bounded nimber given an index
-    fn get_bounded_nimber_by_index(&mut self, index: usize, bound: u16) -> Option<u16> {
+    fn get_bounded_nimber_by_index(&mut self, index: usize, bound: usize) -> Option<usize> {
         loop {
             let entry = &self.data[index];
 
@@ -88,14 +88,14 @@ where
         }
     }
     /// gets the nimber of a game where the parts are given by the given indices
-    fn get_bounded_nimber_by_parts(&mut self, indices: &Vec<usize>, bound: u16) -> Option<u16> {
+    fn get_bounded_nimber_by_parts(&mut self, indices: &Vec<usize>, bound: usize) -> Option<usize> {
         if indices.len() == 0 {
             return Some(0);
         }
         let modifier = indices[0..indices.len() - 1]
             .iter()
             .fold(0, |modifier, index| {
-                modifier ^ self.get_bounded_nimber_by_index(*index, u16::MAX).unwrap()
+                modifier ^ self.get_bounded_nimber_by_index(*index, usize::MAX).unwrap()
             });
         //index of the last part of the current child game
         let last_part = indices.last().unwrap();

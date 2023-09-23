@@ -7,7 +7,7 @@ where
     G: Impartial<G>,
 {
     game: G,
-    possible_nimbers: Vec<u16>,
+    possible_nimbers: Vec<usize>,
     unprocessed_move_indices: Option<Vec<Vec<usize>>>,
 }
 
@@ -22,7 +22,7 @@ where
             unprocessed_move_indices: None,
         }
     }
-    pub fn get_nimber(&self) -> Option<u16>{
+    pub fn get_nimber(&self) -> Option<usize>{
         if self.possible_nimbers.len() == 1{
             Some(self.possible_nimbers[0])
         }
@@ -30,16 +30,16 @@ where
             None
         }
     }
-    pub fn remove_nimber(&mut self, nimber: u16){
+    pub fn remove_nimber(&mut self, nimber: usize){
         match self.possible_nimbers.binary_search(&nimber) {
             Ok(i) => _ = self.possible_nimbers.remove(i),
             Err(_) => (),
         }
     }
-    pub fn set_nimber(&mut self, nimber: u16){
+    pub fn set_nimber(&mut self, nimber: usize){
         self.possible_nimbers = vec![nimber];
     }
-    pub fn get_smallest_possible_nimber(&self) -> u16{
+    pub fn get_smallest_possible_nimber(&self) -> usize{
         self.possible_nimbers[0]
     }
     pub fn get_next_unprocessed_move_index(&mut self) -> Option<Vec<usize>> {

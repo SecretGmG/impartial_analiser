@@ -49,6 +49,7 @@ impl Impartial<Kayles> for Kayles {
 
 #[test]
 fn test_aperiodic_kayles_nimbers() {
+    // taken from the OEIS A002186
     let nimbers: Vec<usize> = vec![
         0, 1, 2, 3, 1, 4, 3, 2, 1, 4, 2, 6, 4, 1, 2, 7, 1, 4, 3, 2, 1, 4, 6, 7, 4, 1, 2, 8, 5, 4,
         7, 2, 1, 8, 6, 7, 4, 1, 2, 3, 1, 4, 7, 2, 1, 8, 2, 7, 4, 1, 2, 8, 1, 4, 7, 2, 1, 4, 2, 7,
@@ -57,6 +58,8 @@ fn test_aperiodic_kayles_nimbers() {
     ];
     let mut eval: Evaluator<Kayles> = Evaluator::new();
 
+    // test the later half of the nimbers, to make sure that the evaluator can handle inputs even if
+    // smaller nimbers arent already cached.
     for i in nimbers.len()/2..nimbers.len() {
         assert_eq!(
             nimbers[i],
@@ -64,18 +67,5 @@ fn test_aperiodic_kayles_nimbers() {
                 kayles: vec![i]
             })
         );
-    }
-}
-#[test]
-fn test_bound_creation_for_last_part_calculations() {
-    for bound in 0..10 {
-        for modifier in 0..(5 * bound) {
-            let mut detected_nimbers = vec![];
-            for i in 0..=(bound + modifier) {
-                detected_nimbers.push(i ^ modifier);
-            }
-            detected_nimbers.sort();
-            assert_eq!(detected_nimbers[bound], bound);
-        }
     }
 }

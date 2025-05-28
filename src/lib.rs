@@ -8,7 +8,7 @@ use std::hash::Hash;
 /// providing the interface to evaluate an impartial game with the Evaluator
 pub trait Impartial<G>: Sized + Clone + Hash + Eq
 where
-    G: Impartial<G>,
+    G: Impartial<Self>,
 {
     fn get_parts(self) -> Vec<G>;
     fn get_max_nimber(&self) -> usize;
@@ -149,19 +149,19 @@ where
     }
 }
 
-fn remove_pairs<T>(mut vec: Vec<T>) -> Vec<T>
+fn remove_pairs<T>(vec : Vec<T>) -> Vec<T>
 where
     T: Eq + Ord,
 {
-    vec.sort();
-    let mut i = 0;
-    while i + 1 < vec.len() {
-        if vec[i] == vec[i + 1] {
-            vec.remove(i);
-            vec.remove(i);
+    let mut result = Vec::with_capacity(vec.len());
+    let mut iter = vec.into_iter().peekable();
+
+    while let Some(x) = iter.next() {
+        if iter.peek() == Some(&x) {
+            iter.next(); // skip the duplicate
         } else {
-            i += 1;
+            result.push(x);
         }
     }
-    return vec;
+    return result;
 }

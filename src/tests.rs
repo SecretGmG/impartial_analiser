@@ -9,16 +9,16 @@ struct Kayles {
 }
 
 impl Impartial<Kayles> for Kayles {
-    fn get_parts(self) -> Vec<Kayles> {
-        return self
+    fn get_parts(&self) -> Option<Vec<Kayles>> {
+        Some(self
             .kayles
             .iter()
             .map(|n| Kayles { kayles: vec![*n] })
-            .collect();
+            .collect())
     }
 
-    fn get_max_nimber(&self) -> usize {
-        return self.kayles.iter().sum();
+    fn get_max_nimber(&self) -> Option<usize> {
+        Some(self.kayles.iter().sum())
     }
 
     fn get_unique_moves(&self) -> Vec<Kayles> {

@@ -10,11 +10,9 @@ pub trait Impartial<G>: Sized + Clone + Hash + Eq
 where
     G: Impartial<Self>,
 {
-    fn get_parts(self) -> Vec<G>;
-    fn get_max_nimber(&self) -> usize;
-    fn get_possible_nimbers(&self) -> Vec<usize> {
-        (0..=self.get_max_nimber()).collect()
-    }
+    fn get_parts(&self) -> Option<Vec<G>>;
+    fn get_max_nimber(&self) -> Option<usize> {None}
+    fn get_impossible_nimbers(&self) -> Vec<usize> {vec![]}
     fn get_unique_moves(&self) -> Vec<G>;
 }
 
@@ -55,8 +53,8 @@ where
         let nimber = self.data[index].get_smallest_possible_nimber();
 
         let mut still_unprocessed_move_indices = vec![];
-        
         while let Some(move_indices) = self.data[index].get_next_unprocessed_move_index() {
+
             match self.get_bounded_nimber_by_parts(&move_indices, nimber) {
                 Some(move_nimber) => {
                     self.data[index].remove_nimber(move_nimber);
@@ -128,10 +126,10 @@ where
         self.data[index].set_child_indices(move_indices);
     }
     pub fn get_part_indices(&mut self, g: G) -> Vec<usize> {
-        g.get_parts()
-            .iter()
-            .map(|part| self.get_index_of(part))
-            .collect()
+        match g.get_parts(){
+            Some(parts) => parts.iter().map(|part| self.get_index_of(part)).collect(),
+            None => vec![self.get_index_of(&g)]
+        }
     }
     pub fn get_index_of(&mut self, g: &G) -> usize {
         if let Some(index) = self.index_map.get(g) {

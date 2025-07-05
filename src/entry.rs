@@ -1,14 +1,20 @@
 use crate::Impartial;
 use serde::{Serialize, Deserialize};
 
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+enum EntryState{
+    Done {nimber : usize},
+    Processing {unprocessed_move_indices : Option<Vec<Vec<usize>>>, max_possible_nimber : Option<usize>, impossible_nimbers : Vec<usize>}
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub(super) struct Entry<G>
 where
     G: Impartial<G>,
 {
+    state : EntryState,
     game: G,
-    possible_nimbers: Vec<usize>,
-    unprocessed_move_indices: Option<Vec<Vec<usize>>>,
 }
 
 impl<G> Entry<G>
@@ -17,23 +23,21 @@ where
 {
     pub fn new(game: G) -> Entry<G> {
         Entry {
-            possible_nimbers : game.get_possible_nimbers(),
+            state : EntryState::Processing { unprocessed_move_indices: None, max_possible_nimber: game.get_max_nimber(), impossible_nimbers: game.get_impossible_nimbers() },
             game: game,
-            unprocessed_move_indices: None,
         }
     }
     pub fn get_nimber(&self) -> Option<usize>{
-        if self.possible_nimbers.len() == 1{
-            Some(self.possible_nimbers[0])
-        }
-        else{
-            None
+        match self.state {
+            EntryState::Done { nimber } => Some(nimber),
+            _ => None
         }
     }
     pub fn remove_nimber(&mut self, nimber: usize){
-        match self.possible_nimbers.binary_search(&nimber) {
-            Ok(i) => _ = self.possible_nimbers.remove(i),
-            Err(_) => (),
+        match &mut self.state {
+            EntryState::Processing { unprocessed_move_indices, max_possible_nimber , impossible_nimbers} =>
+                if !impossible_nimbers.contains(&nimber) {impossible_nimbers.concat(nimber);},
+            _ => panic!("cannot remove nimber from Entry that is Done")
         }
     }
     pub fn set_nimber(&mut self, nimber: usize){

@@ -1,5 +1,3 @@
-use std::slice::SliceIndex;
-
 use crate::Impartial;
 use sorted_vec::SortedSet;
 
@@ -61,4 +59,3 @@ where
         Self { game: game, data: EntryData::Stub {  } }
     }
 }
-

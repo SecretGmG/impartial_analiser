@@ -1,9 +1,10 @@
 mod entry;
 mod tests;
 use entry::Entry;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::Hash;
+
+use crate::entry::{EntryData, ProcessingData};
 
 /// providing the interface to evaluate an impartial game with the Evaluator
 pub trait Impartial<G>: Sized + Clone + Hash + Eq
@@ -11,15 +12,16 @@ where
     G: Impartial<Self>,
 {
     fn get_parts(&self) -> Option<Vec<G>>;
-    fn get_max_nimber(&self) -> Option<usize> {None}
-    fn get_impossible_nimbers(&self) -> Vec<usize> {vec![]}
+    fn get_max_nimber(&self) -> Option<usize> {
+        None
+    }
     fn get_unique_moves(&self) -> Vec<G>;
 }
 
 /// Evaluates an impartial game
 /// The generic arguments specify
 /// a generalized version and a smaller part of a generalized impartial game
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Evaluator<G>
 where
     G: Impartial<G>,
@@ -40,50 +42,55 @@ where
     }
     /// calculates the nimber of an impartial game
     pub fn get_nimber(&mut self, g: G) -> usize {
-        return self.get_bounded_nimber(g, usize::max_value()).unwrap();
+        self.get_bounded_nimber(g, usize::max_value()).unwrap()
     }
     /// calculates the nimber of an impartial game but stoppes if the evaluator
     /// is certain that the nimber of the game is above the bound
     pub fn get_bounded_nimber(&mut self, g: G, bound: usize) -> Option<usize> {
         let parts_indices = self.get_part_indices(g);
-        return self.get_bounded_nimber_by_parts(&parts_indices, bound);
+        self.get_bounded_nimber_by_parts(&parts_indices, bound)
     }
-    fn try_rule_out_smallest_possible_nimber(&mut self, index: usize) {
-        self.get_move_indices(index);
-        let nimber = self.data[index].get_smallest_possible_nimber();
-
+    /// gets bounded nimber given an index
+    fn get_bounded_nimber_by_index(&mut self, index: usize, bound: usize) -> Option<usize> {
+        if let EntryData::Done { nimber } =  self.data[index].data {
+            return Some(nimber);
+        }
+        loop {
+            let data = self.get_processing_data_mut(index).unwrap();
+            let nimber = data.get_smallest_possible_nimber();
+            if nimber > bound {
+                return None;
+            }
+            if !self.try_rule_out_nimber(index, nimber) {
+                self.data[index].data = EntryData::Done { nimber };
+                return Some(nimber);
+            }
+        }
+    }
+    fn try_rule_out_nimber(&mut self, index: usize, nimber : usize) -> bool {
+        if let Some(max_nimber) = self.data[index].game.get_max_nimber(){
+            if max_nimber < nimber {
+                return false;
+            }
+        }
         let mut still_unprocessed_move_indices = vec![];
-        while let Some(move_indices) = self.data[index].get_next_unprocessed_move_index() {
-
+        let mut ruled_out_nimber = false; 
+        while let Some(move_indices) = self.get_processing_data_mut(index).unwrap().pop_unprocessed_move() {
             match self.get_bounded_nimber_by_parts(&move_indices, nimber) {
                 Some(move_nimber) => {
-                    self.data[index].remove_nimber(move_nimber);
-                    if move_nimber == nimber {
-                        self.data[index].add_unprocessed_move_indices(still_unprocessed_move_indices);
-                        return;
+                    self.get_processing_data_mut(index).unwrap().remove_nimber(move_nimber);
+                    if nimber == move_nimber {
+                        ruled_out_nimber = true;
+                        break;
                     }
-                }
-                //since the move was not fully prcessed we need to add it back to the unprocessed moves later
+                },
                 None => {
                     still_unprocessed_move_indices.push(move_indices);
                 },
             }
         }
-        self.data[index].set_nimber(nimber);
-    }
-    /// gets bounded nimber given an index
-    fn get_bounded_nimber_by_index(&mut self, index: usize, bound: usize) -> Option<usize> {
-        loop {
-            let entry = &self.data[index];
-
-            if let Some(nimber) = entry.get_nimber() {
-                return Some(nimber);
-            }
-            if entry.get_smallest_possible_nimber() > bound {
-                return None;
-            }
-            self.try_rule_out_smallest_possible_nimber(index);
-        }
+        self.get_processing_data_mut(index).unwrap().append_unprocessed_moves(still_unprocessed_move_indices);
+        return ruled_out_nimber;
     }
     /// gets the nimber of a game where the parts are given by the given indices
     fn get_bounded_nimber_by_parts(&mut self, indices: &Vec<usize>, bound: usize) -> Option<usize> {
@@ -93,12 +100,18 @@ where
         let modifier = indices[0..indices.len() - 1]
             .iter()
             .fold(0, |modifier, index| {
-                modifier ^ self.get_bounded_nimber_by_index(*index, usize::MAX).unwrap()
+                modifier
+                    ^ self
+                        .get_bounded_nimber_by_index(*index, usize::MAX)
+                        .unwrap()
             });
         //index of the last part of the current child game
         let last_part = indices.last().unwrap();
-        //if the last part has the _nimber == nimber xor modifier
-        match self.get_bounded_nimber_by_index(*last_part, bound + modifier) {
+        // if the last part has the _nimber == nimber xor modifier
+        // the biggest possible nimber of the last part needed to check to make sure
+        // that the total nimber = last nimber ^ modifier is less than the bound
+        // is of the size bound | modifier
+        match self.get_bounded_nimber_by_index(*last_part, bound | modifier) {
             Some(last_nimber) => Some(last_nimber ^ modifier),
             None => None,
         }
@@ -107,35 +120,48 @@ where
     /// a move is represented as a vector of indices refering to the parts the position reached after the move
     /// for better performance all pairs of parts are removed
     /// because they cancel each other out in the calculation of the nimber
-    fn get_move_indices(&mut self, index: usize) {
+    fn generate_move_indices(&mut self, index: usize) {
         //if the moves are already generated stop generating
-        if self.data[index].are_move_indices_generated() {
-            return;
+        let entry = &mut self.data[index];
+        if let EntryData::Stub {  } = entry.data {
+            let mut moves = entry.game.get_unique_moves();
+            //sort by the biggest possible nimber
+            moves.sort_by(|a, b| a.get_max_nimber().cmp(&b.get_max_nimber()));
+            let move_indices: Vec<Vec<usize>> = moves
+                .into_iter()
+                .map(|_move| self.get_part_indices(_move))
+                .map(|part_indices| remove_pairs(part_indices))
+                .collect();
+            // reborrow entry beacuse self can be modified when getting move_indices
+            let entry = &mut self.data[index];
+            entry.data = entry::EntryData::Processing {
+                data: ProcessingData::new(&entry.game, move_indices)
+            };
         }
-        let mut moves = self.data[index].get_unique_moves();
-
-        //sort by the biggest possible nimber
-        moves.sort_by(|a, b| a.get_max_nimber().cmp(&b.get_max_nimber()));
-
-        let move_indices: Vec<Vec<usize>> = moves
-            .into_iter()
-            .map(|_move| self.get_part_indices(_move))
-            .map(|part_indices| remove_pairs(part_indices))
-            .collect();
-
-        self.data[index].set_child_indices(move_indices);
     }
+    fn get_processing_data_mut(&mut self, index: usize) -> Option<&mut ProcessingData> {
+        if let EntryData::Stub {  } = &self.data[index].data {
+            self.generate_move_indices(index);
+        }
+        if let EntryData::Processing { data } = &mut self.data[index].data {
+            Some(data)
+        }
+        else{
+            None
+        }
+    }
+    /// returns indices of g
     pub fn get_part_indices(&mut self, g: G) -> Vec<usize> {
-        match g.get_parts(){
+        match g.get_parts() {
             Some(parts) => parts.iter().map(|part| self.get_index_of(part)).collect(),
-            None => vec![self.get_index_of(&g)]
+            None => vec![self.get_index_of(&g)],
         }
     }
     pub fn get_index_of(&mut self, g: &G) -> usize {
         if let Some(index) = self.index_map.get(g) {
-            return *index;
+            *index
         } else {
-            return self.add_game(g.clone());
+            self.add_game(g.clone())
         }
     }
     pub fn add_game(&mut self, game: G) -> usize {
@@ -143,14 +169,15 @@ where
         let index = self.data.len();
         self.index_map.insert(game, index);
         self.data.push(entry);
-        return index;
+        index
     }
 }
 
-fn remove_pairs<T>(vec : Vec<T>) -> Vec<T>
+fn remove_pairs<T>(mut vec: Vec<T>) -> Vec<T>
 where
     T: Eq + Ord,
 {
+    vec.sort();
     let mut result = Vec::with_capacity(vec.len());
     let mut iter = vec.into_iter().peekable();
 
@@ -161,5 +188,5 @@ where
             result.push(x);
         }
     }
-    return result;
+    result
 }

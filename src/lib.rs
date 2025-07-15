@@ -1,7 +1,7 @@
 mod entry;
 mod tests;
 use entry::Entry;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 use std::hash::Hash;
 
 use crate::entry::{EntryData, ProcessingData};
@@ -21,13 +21,14 @@ where
 /// Evaluates an impartial game
 /// The generic arguments specify
 /// a generalized version and a smaller part of a generalized impartial game
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Evaluator<G>
 where
     G: Impartial<G>,
 {
     data: Vec<Entry<G>>,
     index_map: HashMap<G, usize>,
+    cancel_flag: Arc<AtomicBool>,
 }
 
 impl<G> Evaluator<G>
@@ -38,11 +39,12 @@ where
         Evaluator {
             data: vec![],
             index_map: HashMap::new(),
+            cancel_flag: Arc::new(AtomicBool::new(false))
         }
     }
     /// calculates the nimber of an impartial game
-    pub fn get_nimber(&mut self, g: G) -> usize {
-        self.get_bounded_nimber(g, usize::max_value()).unwrap()
+    pub fn get_nimber(&mut self, g: G) -> Option<usize> {
+        self.get_bounded_nimber(g, usize::max_value())
     }
     /// calculates the nimber of an impartial game but stoppes if the evaluator
     /// is certain that the nimber of the game is above the bound
@@ -56,26 +58,32 @@ where
             return Some(nimber);
         }
         loop {
+            if self.cancel_flag.load(Ordering::Relaxed){
+                return None;
+            }
             let data = self.get_processing_data_mut(index).unwrap();
             let nimber = data.get_smallest_possible_nimber();
             if nimber > bound {
                 return None;
             }
-            if !self.try_rule_out_nimber(index, nimber) {
+            if !self.try_rule_out_nimber(index, nimber)? {
                 self.data[index].data = EntryData::Done { nimber };
                 return Some(nimber);
             }
         }
     }
-    fn try_rule_out_nimber(&mut self, index: usize, nimber : usize) -> bool {
+    fn try_rule_out_nimber(&mut self, index: usize, nimber : usize) -> Option<bool> {
         if let Some(max_nimber) = self.data[index].game.get_max_nimber(){
             if max_nimber < nimber {
-                return false;
+                return Some(false);
             }
         }
         let mut still_unprocessed_move_indices = vec![];
         let mut ruled_out_nimber = false; 
         while let Some(move_indices) = self.get_processing_data_mut(index).unwrap().pop_unprocessed_move() {
+            if self.cancel_flag.load(Ordering::Relaxed){
+                return None;
+            }
             match self.get_bounded_nimber_by_parts(&move_indices, nimber) {
                 Some(move_nimber) => {
                     self.get_processing_data_mut(index).unwrap().remove_nimber(move_nimber);
@@ -90,31 +98,28 @@ where
             }
         }
         self.get_processing_data_mut(index).unwrap().append_unprocessed_moves(still_unprocessed_move_indices);
-        return ruled_out_nimber;
+        return Some(ruled_out_nimber);
     }
     /// gets the nimber of a game where the parts are given by the given indices
     fn get_bounded_nimber_by_parts(&mut self, indices: &Vec<usize>, bound: usize) -> Option<usize> {
         if indices.len() == 0 {
             return Some(0);
         }
-        let modifier = indices[0..indices.len() - 1]
-            .iter()
-            .fold(0, |modifier, index| {
-                modifier
-                    ^ self
-                        .get_bounded_nimber_by_index(*index, usize::MAX)
-                        .unwrap()
-            });
-        //index of the last part of the current child game
-        let last_part = indices.last().unwrap();
+        let mut modifier = 0;
+        for index in &indices[0..indices.len() - 1]{
+            modifier ^= self.get_bounded_nimber_by_index(*index, usize::MAX)?;
+        }
         // if the last part has the _nimber == nimber xor modifier
         // the biggest possible nimber of the last part needed to check to make sure
         // that the total nimber = last nimber ^ modifier is less than the bound
         // is of the size bound | modifier
-        match self.get_bounded_nimber_by_index(*last_part, bound | modifier) {
-            Some(last_nimber) => Some(last_nimber ^ modifier),
-            None => None,
-        }
+        Some(
+            modifier ^ 
+            self.get_bounded_nimber_by_index(
+                *indices.last()?, 
+                bound | modifier
+            )?
+        )
     }
     /// generates a vec of all moves of the entry given by the index
     /// a move is represented as a vector of indices refering to the parts the position reached after the move

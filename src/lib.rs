@@ -1,7 +1,7 @@
 mod entry;
 mod tests;
 use entry::Entry;
-use std::{collections::HashMap, hash::DefaultHasher, ptr::hash, sync::{atomic::{AtomicBool, Ordering}, Arc}};
+use std::{collections::HashMap, hash::{DefaultHasher, Hasher}, ptr::hash, sync::{atomic::{AtomicBool, Ordering}, Arc}, usize};
 use std::hash::Hash;
 
 use crate::entry::{EntryData, ProcessingData};
@@ -34,7 +34,7 @@ where
 impl<G> Evaluator<G>
 where
     G: Impartial<G>,
-{
+{   
     pub fn new() -> Evaluator<G> {
         Evaluator {
             data: vec![],
@@ -59,7 +59,7 @@ where
     }
     /// calculates the nimber of an impartial game
     pub fn get_nimber(&mut self, g: G) -> Option<usize> {
-        self.get_bounded_nimber(g, usize::max_value())
+        self.get_bounded_nimber(g, usize::MAX)
     }
     /// calculates the nimber of an impartial game but stoppes if the evaluator
     /// is certain that the nimber of the game is above the bound
@@ -88,7 +88,7 @@ where
         }
     }
     fn try_rule_out_nimber(&mut self, index: usize, nimber : usize) -> Option<bool> {
-        if let Some(max_nimber) = self.data[index].game.get_max_nimber(){
+        if let Some(max_nimber) = self.data[index].max_nimber{
             if max_nimber < nimber {
                 return Some(false);
             }
@@ -145,18 +145,26 @@ where
         let entry = &mut self.data[index];
         if entry.is_stub() {
             let mut moves = entry.game.get_moves();
-            moves.sort_by_key(|m| hash(m, &mut DefaultHasher::new()));
+            moves.sort_by_cached_key(|m| {
+                let mut hasher = DefaultHasher::new();
+                hash(m, &mut hasher);
+                return hasher.finish()
+            });
             moves.dedup();
-            //moves.sort_by_cached_key(|m| m.get_max_nimber());
-            let move_indices: Vec<Vec<usize>> = moves
+            let mut move_indices: Vec<Vec<usize>> = moves
                 .into_iter()
                 .map(|_move| self.get_part_indices(_move))
                 .map(|part_indices| remove_pairs(part_indices))
                 .collect();
             // reborrow entry beacuse self can be modified when getting move_indices
+            
+            move_indices.sort_by_cached_key(|move_parts| {
+                move_parts.iter().map(|move_part| self.data[*move_part].max_nimber.unwrap_or(usize::MAX)).max()
+            });
+
             let entry = &mut self.data[index];
             entry.data = entry::EntryData::Processing {
-                data: ProcessingData::new(&entry.game, move_indices)
+                data: ProcessingData::new(move_indices)
             };
         }
     }

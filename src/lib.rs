@@ -145,10 +145,9 @@ where
         let entry = &mut self.data[index];
         if entry.is_stub() {
             let mut moves = entry.game.get_moves();
-            let mut hasher = DefaultHasher::new();
-            moves.sort_by_key(|m| hash(m, &mut hasher));
+            moves.sort_by_key(|m| hash(m, &mut DefaultHasher::new()));
             moves.dedup();
-            moves.sort_by_cached_key(|m| m.get_max_nimber());
+            //moves.sort_by_cached_key(|m| m.get_max_nimber());
             let move_indices: Vec<Vec<usize>> = moves
                 .into_iter()
                 .map(|_move| self.get_part_indices(_move))

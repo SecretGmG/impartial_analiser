@@ -151,7 +151,7 @@ where
                 return hasher.finish()
             });
             moves.dedup();
-            let mut move_indices: Vec<Vec<usize>> = moves
+            let move_indices: Vec<Vec<usize>> = moves
                 .into_iter()
                 .map(|_move| self.get_part_indices(_move))
                 .map(|part_indices| remove_pairs(part_indices))

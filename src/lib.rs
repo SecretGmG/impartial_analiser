@@ -158,9 +158,9 @@ where
                 .collect();
             // reborrow entry beacuse self can be modified when getting move_indices
             
-            move_indices.sort_by_cached_key(|move_parts| {
-                move_parts.iter().map(|move_part| self.data[*move_part].max_nimber.unwrap_or(usize::MAX)).max()
-            });
+            //move_indices.sort_by_cached_key(|move_parts| {
+            //    move_parts.iter().map(|move_part| self.data[*move_part].max_nimber.unwrap_or(usize::MAX)).max()
+            //});
 
             let entry = &mut self.data[index];
             entry.data = entry::EntryData::Processing {

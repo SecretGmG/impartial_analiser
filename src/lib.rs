@@ -76,7 +76,7 @@ where
             if self.cancel_flag.load(Ordering::Relaxed){
                 return None;
             }
-            let data = self.get_processing_data_mut(index).unwrap();
+            let data = self.get_processing_data_mut(index);
             let nimber = data.get_smallest_possible_nimber();
             if nimber > bound {
                 return None;
@@ -95,13 +95,13 @@ where
         }
         let mut still_unprocessed_move_indices = vec![];
         let mut ruled_out_nimber = false; 
-        while let Some(move_indices) = self.get_processing_data_mut(index).unwrap().pop_unprocessed_move() {
+        while let Some(move_indices) = self.get_processing_data_mut(index).pop_unprocessed_move() {
             if self.cancel_flag.load(Ordering::Relaxed){
                 return None;
             }
             match self.get_bounded_nimber_by_parts(&move_indices, nimber) {
                 Some(move_nimber) => {
-                    self.get_processing_data_mut(index).unwrap().remove_nimber(move_nimber);
+                    self.get_processing_data_mut(index).remove_nimber(move_nimber);
                     if nimber == move_nimber {
                         ruled_out_nimber = true;
                         break;
@@ -112,7 +112,7 @@ where
                 },
             }
         }
-        self.get_processing_data_mut(index).unwrap().append_unprocessed_moves(still_unprocessed_move_indices);
+        self.get_processing_data_mut(index).append_unprocessed_moves(still_unprocessed_move_indices);
         return Some(ruled_out_nimber);
     }
     /// gets the nimber of a game where the parts are given by the given indices
@@ -143,7 +143,7 @@ where
     fn generate_move_indices(&mut self, index: usize) {
         //if the moves are already generated stop generating
         let entry = &mut self.data[index];
-        if let EntryData::Stub {  } = entry.data {
+        if entry.is_stub() {
             let mut moves = entry.game.get_unique_moves();
             //sort by the biggest possible nimber
             moves.sort_by(|a, b| a.get_max_nimber().cmp(&b.get_max_nimber()));
@@ -159,16 +159,14 @@ where
             };
         }
     }
-    fn get_processing_data_mut(&mut self, index: usize) -> Option<&mut ProcessingData> {
-        if let EntryData::Stub {  } = &self.data[index].data {
+    fn get_processing_data_mut(&mut self, index: usize) -> &mut ProcessingData {
+        if self.data[index].is_stub() {
             self.generate_move_indices(index);
         }
         if let EntryData::Processing { data } = &mut self.data[index].data {
-            Some(data)
+            return data;
         }
-        else{
-            None
-        }
+        panic!("get_processing_data_mut can only be called in branches where the entry is not already done")
     }
     /// returns indices of g
     pub fn get_part_indices(&mut self, g: G) -> Vec<usize> {
@@ -195,18 +193,27 @@ where
 
 fn remove_pairs<T>(mut vec: Vec<T>) -> Vec<T>
 where
-    T: Eq + Ord,
+    T: Eq + Ord + Copy,
 {
     vec.sort();
-    let mut result = Vec::with_capacity(vec.len());
-    let mut iter = vec.into_iter().peekable();
 
-    while let Some(x) = iter.next() {
-        if iter.peek() == Some(&x) {
-            iter.next(); // skip the duplicate
-        } else {
-            result.push(x);
+    let mut read = 0;
+    let mut write = 0;
+
+    while read+1 < vec.len(){
+        if vec[read] == vec[read+1]{
+            read += 2;
+        }
+        else{
+            vec[write] = vec[read];
+            read += 1;
+            write += 1;
         }
     }
-    result
+    if read < vec.len() {
+        vec[write] = vec[read];
+        write += 1;
+    }
+    vec.truncate(write);
+    vec
 }

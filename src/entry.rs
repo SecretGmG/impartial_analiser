@@ -58,4 +58,10 @@ where
     pub fn new(game: G) -> Entry<G> {
         Self { game: game, data: EntryData::Stub {  } }
     }
+    pub fn is_stub(&self) -> bool {
+        match self.data {
+            EntryData::Stub {  } => true,
+            _ => false
+        }
+    }
 }

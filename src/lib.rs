@@ -1,7 +1,7 @@
 mod entry;
 mod tests;
 use entry::Entry;
-use std::{collections::HashMap, sync::{atomic::{AtomicBool, Ordering}, Arc}};
+use std::{collections::HashMap, hash::DefaultHasher, ptr::hash, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 use std::hash::Hash;
 
 use crate::entry::{EntryData, ProcessingData};
@@ -15,7 +15,7 @@ where
     fn get_max_nimber(&self) -> Option<usize> {
         None
     }
-    fn get_unique_moves(&self) -> Vec<G>;
+    fn get_moves(&self) -> Vec<G>;
 }
 
 /// Evaluates an impartial game
@@ -144,9 +144,11 @@ where
         //if the moves are already generated stop generating
         let entry = &mut self.data[index];
         if entry.is_stub() {
-            let mut moves = entry.game.get_unique_moves();
-            //sort by the biggest possible nimber
-            moves.sort_by(|a, b| a.get_max_nimber().cmp(&b.get_max_nimber()));
+            let mut moves = entry.game.get_moves();
+            let mut hasher = DefaultHasher::new();
+            moves.sort_by_key(|m| hash(m, &mut hasher));
+            moves.dedup();
+            moves.sort_by_cached_key(|m| m.get_max_nimber());
             let move_indices: Vec<Vec<usize>> = moves
                 .into_iter()
                 .map(|_move| self.get_part_indices(_move))

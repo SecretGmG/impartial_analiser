@@ -21,7 +21,7 @@ impl Impartial<Kayles> for Kayles {
         Some(self.kayles.iter().sum())
     }
 
-    fn get_unique_moves(&self) -> Vec<Kayles> {
+    fn get_moves(&self) -> Vec<Kayles> {
         let mut moves: Vec<Kayles> = vec![];
         for i in 0..self.kayles.len() {
             let size = (self.kayles[i] + 1) / 2;

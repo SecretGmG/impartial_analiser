@@ -54,6 +54,9 @@ where
     pub fn get_cache_size(&self) -> usize{
         self.data.len()
     }
+    pub fn get_cancel_flag(&self) -> Arc<AtomicBool>{
+        self.cancel_flag.clone()
+    }
     /// calculates the nimber of an impartial game
     pub fn get_nimber(&mut self, g: G) -> Option<usize> {
         self.get_bounded_nimber(g, usize::max_value())

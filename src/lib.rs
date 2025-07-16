@@ -1,7 +1,7 @@
 mod entry;
 mod tests;
 use entry::Entry;
-use std::{collections::HashMap, sync::{Arc, atomic::{AtomicBool, Ordering}}};
+use std::{collections::HashMap, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 use std::hash::Hash;
 
 use crate::entry::{EntryData, ProcessingData};
@@ -41,6 +41,18 @@ where
             index_map: HashMap::new(),
             cancel_flag: Arc::new(AtomicBool::new(false))
         }
+    }
+    pub fn get_nimbers(&self) -> Vec<(G, usize)>{
+        self.data.iter().filter_map(|e| {
+            let nimber = match  e.data {
+                EntryData::Done { nimber } => Some(nimber),
+                _ => None,
+            }?;
+            Some((e.game.clone(), nimber))
+        }).collect()
+    }
+    pub fn get_cache_size(&self) -> usize{
+        self.data.len()
     }
     /// calculates the nimber of an impartial game
     pub fn get_nimber(&mut self, g: G) -> Option<usize> {

@@ -3,8 +3,7 @@ use dashmap::DashMap;
 use entry::Entry;
 use std::hash::Hash;
 use std::{
-    hash::{DefaultHasher, Hasher},
-    ptr::hash,
+    hash::{DefaultHasher},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -217,11 +216,7 @@ where
         }
 
         let mut moves = game.get_moves();
-        moves.sort_unstable_by_key(|m| {
-            let mut hasher = DefaultHasher::new();
-            hash(m, &mut hasher);
-            hasher.finish()
-        });
+        moves.sort_unstable_by_key(|m| m.hash(&mut DefaultHasher::new()));
         moves.dedup();
 
         let move_indices: Vec<Vec<G>> = moves
@@ -247,11 +242,7 @@ fn remove_pairs<G>(mut vec: Vec<G>) -> Vec<G>
 where
     G: Impartial<G>,
 {
-    vec.sort_by_cached_key(|m| {
-        let mut hasher = DefaultHasher::new();
-        hash(m, &mut hasher);
-        hasher.finish()
-    });
+    vec.sort_by_cached_key(|m| m.hash(&mut DefaultHasher::new()));
 
     let mut read = 0;
     let mut write = 0;

@@ -48,6 +48,25 @@ impl Impartial<Kayles> for Kayles {
 }
 
 #[test]
+fn test_simple_kayle_nimbers() {
+    let nimbers: Vec<usize> = vec![
+        0, 1, 2, 3
+    ];
+    let eval: Evaluator<Kayles> = Evaluator::new();
+
+    // test the later half of the nimbers, to make sure that the evaluator can handle inputs even if
+    // smaller nimbers arent already cached.
+    for i in nimbers.len()/2..nimbers.len() {
+        assert_eq!(
+            nimbers[i],
+            eval.get_nimber(&Kayles {
+                kayles: vec![i]
+            }).unwrap()
+        );
+    }
+}
+
+#[test]
 fn test_aperiodic_kayles_nimbers() {
     // taken from the OEIS A002186
     let nimbers: Vec<usize> = vec![
@@ -56,14 +75,14 @@ fn test_aperiodic_kayles_nimbers() {
         4, 1, 2, 8, 1, 4, 7, 2, 1, 8, 6, 7, 4, 1, 2, 8, 1, 4, 7, 2, 1, 8, 2, 7, 4, 1, 2, 8, 1, 4,
         7, 2, 1, 8, 2, 7, 4, 1, 2, 8, 1, 4, 7, 2, 1
     ];
-    let mut eval: Evaluator<Kayles> = Evaluator::new();
+    let eval: Evaluator<Kayles> = Evaluator::new();
 
     // test the later half of the nimbers, to make sure that the evaluator can handle inputs even if
     // smaller nimbers arent already cached.
     for i in nimbers.len()/2..nimbers.len() {
         assert_eq!(
             nimbers[i],
-            eval.get_nimber(Kayles {
+            eval.get_nimber(&Kayles {
                 kayles: vec![i]
             }).unwrap()
         );
@@ -76,7 +95,7 @@ fn test_cancellation() {
     use std::time::Duration;
 
     // Start with a fresh evaluator and evaluate a complex Kayles position
-    let mut eval = Evaluator::new();
+    let eval = Evaluator::new();
     let target = Kayles { kayles: vec![100] };
 
     // Spawn a thread to simulate cancellation after a short delay
@@ -87,19 +106,19 @@ fn test_cancellation() {
     });
 
     // Attempt to evaluate, expecting it to be cancelled
-    let result = eval.get_nimber(target.clone());
+    let result = eval.get_nimber(&target);
     assert_eq!(result, None, "Evaluation should be cancelled");
 
     // Reset the cancellation flag
     eval.cancel_flag.store(false, Ordering::Relaxed);
 
     // Try again — should continue from cached state
-    let result2 = eval.get_nimber(target.clone());
+    let result2 = eval.get_nimber(&target);
     assert!(result2.is_some(), "Evaluation should complete after resuming");
 
     // Cache should now be valid; validate result against a clean evaluator
-    let mut fresh_eval = Evaluator::new();
-    let expected = fresh_eval.get_nimber(target.clone()).unwrap();
+    let fresh_eval = Evaluator::new();
+    let expected = fresh_eval.get_nimber(&target).unwrap();
     assert_eq!(
         result2.unwrap(),
         expected,
@@ -107,31 +126,31 @@ fn test_cancellation() {
     );
 
     // Do another cancellation-resume cycle on a new, larger input
-    let mut eval2 = eval.clone();
+    let eval2 = eval.clone();
     let new_target = Kayles { kayles: vec![200] };
     let cancel_flag2 = eval2.cancel_flag.clone();
     thread::spawn(move || {
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(5));
         cancel_flag2.store(true, Ordering::Relaxed);
     });
 
-    let result3 = eval2.get_nimber(new_target.clone());
+    let result3 = eval2.get_nimber(&new_target);
     assert_eq!(result3, None, "Second cancellation should also interrupt");
 
     eval2.cancel_flag.store(false, Ordering::Relaxed);
     let cancel_flag3 = eval2.cancel_flag.clone();
     thread::spawn(move || {
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(5));
         cancel_flag3.store(true, Ordering::Relaxed);
     });
-    let result4 = eval2.get_nimber(new_target.clone());
+    let result4 = eval2.get_nimber(&new_target);
     assert_eq!(result4, None, "Third cancellation should still interrupt");
 
     eval2.cancel_flag.store(false, Ordering::Relaxed);
-    let result5 = eval2.get_nimber(new_target.clone()).unwrap();
+    let result5 = eval2.get_nimber(&new_target).unwrap();
 
-    let mut fresh_eval2 = Evaluator::new();
-    let expected2 = fresh_eval2.get_nimber(new_target.clone()).unwrap();
+    let fresh_eval2 = Evaluator::new();
+    let expected2 = fresh_eval2.get_nimber(&new_target).unwrap();
     assert_eq!(
         result5,
         expected2,

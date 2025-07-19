@@ -61,10 +61,7 @@ where
         self.cache
             .iter()
             .filter_map(|e| {
-                let nimber = match e.data {
-                    EntryData::Done { nimber } => Some(nimber),
-                    _ => None,
-                }?;
+                let nimber = e.get_nimber()?;
                 Some((e.key().clone(), nimber))
             })
             .collect()
@@ -102,9 +99,8 @@ where
                 .insert(part.clone(), Entry::new(part.get_max_nimber()));
         }
 
-        match &self.cache.get(part).unwrap().data {
-            EntryData::Done { nimber } => return Some(*nimber),
-            _ => (),
+        if let Some(nimber) = self.cache.get(part).unwrap().get_nimber(){
+            return Some(nimber);
         }
 
         self.destub(part);

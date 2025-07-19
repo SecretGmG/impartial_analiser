@@ -71,6 +71,13 @@ where
             _ => false,
         }
     }
+    pub fn get_nimber(&self) -> Option<usize> {
+        match &self.data {
+            EntryData::Done { nimber } => Some(*nimber),
+            _ => None
+        }
+    }
+
     pub fn get_smallest_possible_nimber(&self) -> Option<usize> {
         match &self.data {
             EntryData::Processing { data } => Some(data.get_smallest_possible_nimber()),

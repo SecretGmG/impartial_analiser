@@ -1,14 +1,13 @@
 mod entry;
 use dashmap::DashMap;
 use entry::Entry;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::{
-    hash::{DefaultHasher},
+    hash::DefaultHasher,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    usize,
 };
 
 mod tests;
@@ -16,29 +15,32 @@ mod tests;
 use crate::entry::{EntryData, ProcessingData};
 
 /// Provides the interface for evaluating an impartial game with the `Evaluator`.
-pub trait Impartial<G>: Sized + Clone + Hash + Eq
-where
-    G: Impartial<Self>,
-{
-    /// Returns the components (subgames) of the game, if any.
-    fn get_parts(&self) -> Option<Vec<G>>;
+pub trait Impartial: Sized + Clone + Hash + Eq {
+    /// Returns the list of successor game states (i.e., possible moves).
+    fn get_split_moves(&self) -> Vec<Vec<Self>>;
 
     /// Returns the maximum nimber this game could have, if known.
     fn get_max_nimber(&self) -> Option<usize> {
         None
     }
-
-    /// Returns the list of successor game states (i.e., possible moves).
-    fn get_moves(&self) -> Vec<G>;
 }
 
-/// Evaluates impartial games via memoized recursive computation of nimbers.
+impl<G> Default for Evaluator<G>
+where
+    G: Impartial,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Evaluates impartial games via memoized :recursive computation of nimbers.
 ///
 /// `G` is the game type, which must implement `Impartial<G>`.
 #[derive(Debug, Clone)]
 pub struct Evaluator<G>
 where
-    G: Impartial<G>,
+    G: Impartial,
 {
     cache: Arc<DashMap<G, Entry<G>>>,
     cancel_flag: Arc<AtomicBool>,
@@ -46,7 +48,7 @@ where
 
 impl<G> Evaluator<G>
 where
-    G: Impartial<G>,
+    G: Impartial,
 {
     /// Constructs a new, empty evaluator.
     pub fn new() -> Evaluator<G> {
@@ -80,15 +82,39 @@ where
 
     /// Computes the nimber of the given game.
     /// Returns `None` if cancelled mid-computation.
-    pub fn get_nimber(&self, g: &G) -> Option<usize> {
-        self.get_bounded_nimber(g, usize::MAX)
+    /// Note, to keep the api smaller no explicit split functionm is required in Impartial
+    /// Due to this it is recommended to use get_nimber_by_parts in most cases, where splitting
+    /// the game is feasible
+    pub fn get_nimber(&self, game: &G) -> Option<usize> {
+        self.get_bounded_nimber(game, usize::MAX)
     }
 
-    /// Computes the nimber of a game, but aborts early if it can be proven
-    /// that the nimber exceeds the provided upper bound.
+    /// Computes the nimber of a game, but aborts early if it can be proven that the nimber exceeds the provided upper bound.
     pub fn get_bounded_nimber(&self, g: &G, bound: usize) -> Option<usize> {
-        let parts = g.get_parts().unwrap_or(vec![g.clone()]);
-        self.get_bounded_nimber_by_parts(&parts, bound)
+        self.get_bounded_nimber_by_parts(std::slice::from_ref(g), bound)
+    }
+    /// Computes the nimber of the given game decomposed into its parts.
+    /// Returns `None` if cancelled mid-computation.
+    pub fn get_nimber_by_parts(&self, parts: &[G]) -> Option<usize> {
+        self.get_bounded_nimber_by_parts(parts, usize::MAX)
+    }
+
+    /// Computes the nimber of a sum of game parts under a bound.
+    ///
+    /// The result is computed as the XOR of the nimbers of each part,
+    /// stopping early if it becomes clear the nimber would exceed the bound.
+    pub fn get_bounded_nimber_by_parts(&self, parts: &[G], bound: usize) -> Option<usize> {
+        if parts.is_empty() {
+            return Some(0);
+        }
+        let mut modifier = 0;
+        for part in &parts[0..parts.len() - 1] {
+            modifier ^= self.get_bounded_nimber_of_part(part, usize::MAX)?;
+        }
+        // The bound is adjusted with `| modifier` to ensure that the final XOR result
+        // isn't incorrectly pruned: if any intermediate nimber exceeds the original bound,
+        // but the XOR still stays within it, we don't want a false early exit.
+        Some(modifier ^ self.get_bounded_nimber_of_part(parts.last()?, bound | modifier)?)
     }
 
     /// Computes the nimber of a specific game part with an upper bound.
@@ -99,7 +125,7 @@ where
                 .insert(part.clone(), Entry::new(part.get_max_nimber()));
         }
 
-        if let Some(nimber) = self.cache.get(part).unwrap().get_nimber(){
+        if let Some(nimber) = self.cache.get(part).unwrap().get_nimber() {
             return Some(nimber);
         }
 
@@ -180,53 +206,36 @@ where
         Some(ruled_out_nimber)
     }
 
-    /// Computes the nimber of a sum of game parts under a bound.
-    ///
-    /// The result is computed as the XOR of the nimbers of each part,
-    /// stopping early if it becomes clear the nimber would exceed the bound.
-    fn get_bounded_nimber_by_parts(&self, parts: &Vec<G>, bound: usize) -> Option<usize> {
-        if parts.len() == 0 {
-            return Some(0);
-        }
-        let mut modifier = 0;
-        for part in &parts[0..parts.len() - 1] {
-            modifier ^= self.get_bounded_nimber_of_part(part, usize::MAX)?;
-        }
-        // The bound is adjusted with `| modifier` to ensure that the final XOR result
-        // isn't incorrectly pruned: if any intermediate nimber exceeds the original bound,
-        // but the XOR still stays within it, we don't want a false early exit.
-        Some(modifier ^ self.get_bounded_nimber_of_part(parts.last()?, bound | modifier)?)
-    }
-
     /// Initializes the move list for a game that is still a stub.
     ///
     /// For each move, the resulting game parts are reduced by canceling out
     /// symmetric pairs (since they XOR to 0).
     fn destub(&self, game: &G) {
         let is_stub = {
-            let entry = self.cache.get_mut(game).unwrap();
+            let entry = self
+                .cache
+                .get_mut(game)
+                .expect("entry should exist, bug in entry initialization");
             entry.is_stub()
         };
         if !is_stub {
             return;
         }
 
-        let mut moves = game.get_moves();
-        moves.sort_unstable_by_key(|m| m.hash(&mut DefaultHasher::new()));
+        let mut moves = game.get_split_moves();
+        moves.sort_by_cached_key(|m| {
+            let mut hasher = DefaultHasher::new();
+            m.hash(&mut hasher);
+            hasher.finish()
+        });
         moves.dedup();
 
-        let move_indices: Vec<Vec<G>> = moves
-            .into_iter()
-            .map(|_move| match _move.get_parts() {
-                Some(parts) => remove_pairs(parts),
-                None => vec![_move.clone()],
-            })
-            .collect();
+        moves.iter_mut().for_each(|m| remove_pairs(m));
 
         {
             let mut entry = self.cache.get_mut(game).unwrap();
             entry.data = entry::EntryData::Processing {
-                data: ProcessingData::new(move_indices),
+                data: ProcessingData::new(moves),
             };
         }
     }
@@ -234,11 +243,15 @@ where
 
 /// Removes consecutive pairs of equal elements in a sorted list.
 /// Used to cancel out symmetric subgames when computing nimbers.
-fn remove_pairs<G>(mut vec: Vec<G>) -> Vec<G>
+fn remove_pairs<G>(vec: &mut Vec<G>)
 where
-    G: Impartial<G>,
+    G: Impartial,
 {
-    vec.sort_by_cached_key(|m| m.hash(&mut DefaultHasher::new()));
+    vec.sort_by_cached_key(|m| {
+        let mut hasher = DefaultHasher::new();
+        m.hash(&mut hasher);
+        hasher.finish()
+    });
 
     let mut read = 0;
     let mut write = 0;
@@ -257,5 +270,4 @@ where
         write += 1;
     }
     vec.truncate(write);
-    vec
 }

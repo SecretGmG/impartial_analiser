@@ -60,9 +60,15 @@ where
     G: Impartial,
 {
     pub fn new(max_nimber: Option<usize>) -> Entry<G> {
-        Self {
-            max_nimber,
-            data: EntryData::Stub {},
+        match max_nimber {
+            Some(0) => Self {
+                max_nimber: Some(0),
+                data: EntryData::Done { nimber: 0 },
+            },
+            _ => Self {
+                max_nimber,
+                data: EntryData::Stub {},
+            },
         }
     }
     pub fn is_stub(&self) -> bool {

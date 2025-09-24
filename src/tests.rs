@@ -46,9 +46,9 @@ fn test_simple_kayle_nimbers() {
 
     // test the later half of the nimbers, to make sure that the evaluator can handle inputs even if
     // smaller nimbers arent already cached.
-    for i in nimbers.len() / 2..nimbers.len() {
+    (nimbers.len() / 2..nimbers.len()).for_each(|i| {
         assert_eq!(nimbers[i], eval.get_nimber(&Kayles { kayles: i }).unwrap());
-    }
+    });
 }
 
 #[test]
@@ -64,9 +64,9 @@ fn test_aperiodic_kayles_nimbers() {
 
     // test the later half of the nimbers, to make sure that the evaluator can handle inputs even if
     // smaller nimbers arent already cached.
-    for i in nimbers.len() / 2..nimbers.len() {
+    (nimbers.len() / 2..nimbers.len()).for_each(|i| {
         assert_eq!(nimbers[i], eval.get_nimber(&Kayles { kayles: i }).unwrap());
-    }
+    });
 }
 #[test]
 fn test_cancellation() {
@@ -138,4 +138,22 @@ fn test_cancellation() {
         result5, expected2,
         "Result after second resume should match fresh computation"
     );
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+struct ZeroGame {}
+
+impl Impartial for ZeroGame {
+    fn get_split_moves(&self) -> Vec<Vec<Self>> {
+        panic!("moves should never be generated for this game");
+    }
+    fn get_max_nimber(&self) -> Option<usize> {
+        Some(0)
+    }
+}
+
+#[test]
+fn test_early_cancellation() {
+    let e = Evaluator::new();
+    assert_eq!(e.get_nimber(&ZeroGame {}), Some(0));
 }

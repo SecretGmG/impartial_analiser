@@ -1,12 +1,12 @@
 mod entry;
-use dashmap::DashMap;
+use dashmap::{DashMap, Map};
 use entry::Entry;
 use std::hash::{Hash, Hasher};
 use std::{
     hash::DefaultHasher,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -72,6 +72,20 @@ where
     /// Returns the number of entries stored in the evaluator cache.
     pub fn get_cache_size(&self) -> usize {
         self.cache.len()
+    }
+    /// Retrurns the number of stubs, processing and done Cache entries.
+    pub fn get_cache_stats(&self) -> (usize, usize, usize) {
+        let mut stub = 0;
+        let mut processing = 0;
+        let mut done = 0;
+        for entry in self.cache.iter() {
+            match &entry.data {
+                EntryData::Stub { .. } => stub += 1,
+                EntryData::Processing { .. } => processing += 1,
+                EntryData::Done { .. } => done += 1,
+            }
+        }
+        (stub, processing, done)
     }
 
     /// Returns a handle to the evaluator’s cancellation flag.

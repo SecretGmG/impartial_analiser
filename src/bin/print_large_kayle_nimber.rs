@@ -13,5 +13,5 @@ fn main() {
         .parse()
         .expect("could not be parsed to integer");
     let eval = Evaluator::new();
-    eval.print_nimber_and_stats(&Kayles { kayles });
+    eval.print_nimber_and_stats_of_game(Kayles { kayles });
 }

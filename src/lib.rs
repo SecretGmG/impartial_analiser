@@ -261,7 +261,10 @@ impl<G> Evaluator<G>
 where
     G: Impartial + Send + Sync + 'static,
 {
-    pub fn print_nimber_and_stats(&self, game: &G) -> Option<usize> {
+    pub fn print_nimber_and_stats_of_game(&self, game: G) -> Option<usize> {
+        self.print_nimber_and_stats_of_games(vec![game])
+    }
+    pub fn print_nimber_and_stats_of_games(&self, games: Vec<G>) -> Option<usize> {
         let eval_for_worker = self.clone(); // requires Clone on Evaluator
         let eval_for_monitor = self.clone();
         let stop_flag = Arc::new(AtomicBool::new(false));
@@ -269,9 +272,8 @@ where
         let stop_for_worker = stop_flag.clone();
 
         // Worker thread computes the nimber
-        let game_cloned = game.clone();
         let worker = thread::spawn(move || {
-            let nimber = eval_for_worker.get_nimber(&game_cloned);
+            let nimber = eval_for_worker.get_nimber_by_parts(&games);
             stop_for_worker.store(true, Ordering::Relaxed); // signal monitor to stop
             nimber
         });

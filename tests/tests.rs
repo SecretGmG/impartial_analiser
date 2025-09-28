@@ -1,7 +1,7 @@
 #![cfg(test)]
 use std::{cmp::min, vec};
 
-use crate::{Evaluator, Impartial};
+use evaluator::{Evaluator, Impartial};
 
 const MAX_REMOVE: usize = 2;
 
@@ -70,7 +70,6 @@ fn test_aperiodic_kayles_nimbers() {
 }
 #[test]
 fn test_cancellation() {
-    use std::sync::atomic::Ordering;
     use std::thread;
     use std::time::Duration;
 
@@ -79,18 +78,16 @@ fn test_cancellation() {
     let target = Kayles { kayles: 200 };
 
     // Spawn a thread to simulate cancellation after a short delay
-    let cancel_flag1 = eval.cancel_flag.clone();
+    let cloned_eval = eval.clone();
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(5));
-        cancel_flag1.store(true, Ordering::Relaxed);
+        cloned_eval.stop();
     });
 
     // Attempt to evaluate, expecting it to be cancelled
     let result = eval.get_nimber(&target);
     assert_eq!(result, None, "Evaluation should be cancelled");
-
-    // Reset the cancellation flag
-    eval.cancel_flag.store(false, Ordering::Relaxed);
+    eval.resume();
 
     // Try again — should continue from cached state
     let result2 = eval.get_nimber(&target);
@@ -109,28 +106,28 @@ fn test_cancellation() {
     );
 
     // Do another cancellation-resume cycle on a new, larger input
-    let eval2 = eval.clone();
+    let cloned_eval = eval.clone();
     let new_target = Kayles { kayles: 300 };
-    let cancel_flag2 = eval2.cancel_flag.clone();
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(5));
-        cancel_flag2.store(true, Ordering::Relaxed);
+        cloned_eval.stop();
     });
 
-    let result3 = eval2.get_nimber(&new_target);
+    eval.resume();
+    let result3 = eval.get_nimber(&new_target);
     assert_eq!(result3, None, "Second cancellation should also interrupt");
 
-    eval2.cancel_flag.store(false, Ordering::Relaxed);
-    let cancel_flag3 = eval2.cancel_flag.clone();
+    let cloned_eval = eval.clone();
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(5));
-        cancel_flag3.store(true, Ordering::Relaxed);
+        cloned_eval.stop();
     });
-    let result4 = eval2.get_nimber(&new_target);
-    assert_eq!(result4, None, "Third cancellation should still interrupt");
+    eval.resume();
+    let result4 = eval.get_nimber(&new_target);
 
-    eval2.cancel_flag.store(false, Ordering::Relaxed);
-    let result5 = eval2.get_nimber(&new_target).unwrap();
+    assert_eq!(result4, None, "Third cancellation should still interrupt");
+    eval.resume();
+    let result5 = eval.get_nimber(&new_target).unwrap();
 
     let fresh_eval2 = Evaluator::new();
     let expected2 = fresh_eval2.get_nimber(&new_target).unwrap();

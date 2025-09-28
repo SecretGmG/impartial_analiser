@@ -1,7 +1,10 @@
 mod entry;
-use dashmap::{DashMap, Map};
+pub mod kayles;
+use dashmap::DashMap;
 use entry::Entry;
 use std::hash::{Hash, Hasher};
+use std::io::Write;
+use std::time::Duration;
 use std::{
     hash::DefaultHasher,
     sync::{
@@ -9,8 +12,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-
-mod tests;
+use std::{io, thread};
 
 use crate::entry::{EntryData, ProcessingData};
 
@@ -43,7 +45,7 @@ where
     G: Impartial,
 {
     cache: Arc<DashMap<G, Entry<G>>>,
-    cancel_flag: Arc<AtomicBool>,
+    pub cancel_flag: Arc<AtomicBool>,
 }
 
 impl<G> Evaluator<G>
@@ -88,10 +90,11 @@ where
         (stub, processing, done)
     }
 
-    /// Returns a handle to the evaluator’s cancellation flag.
-    /// Can be set externally to abort ongoing computation.
-    pub fn get_cancel_flag(&self) -> Arc<AtomicBool> {
-        self.cancel_flag.clone()
+    pub fn stop(&self) {
+        self.cancel_flag.store(true, Ordering::Relaxed);
+    }
+    pub fn resume(&self) {
+        self.cancel_flag.store(false, Ordering::Relaxed);
     }
 
     /// Computes the nimber of the given game.
@@ -254,7 +257,48 @@ where
         }
     }
 }
+impl<G> Evaluator<G>
+where
+    G: Impartial + Send + Sync + 'static,
+{
+    pub fn print_nimber_and_stats(&self, game: &G) -> Option<usize> {
+        let eval_for_worker = self.clone(); // requires Clone on Evaluator
+        let eval_for_monitor = self.clone();
+        let stop_flag = Arc::new(AtomicBool::new(false));
+        let stop_for_monitor = stop_flag.clone();
+        let stop_for_worker = stop_flag.clone();
 
+        // Worker thread computes the nimber
+        let game_cloned = game.clone();
+        let worker = thread::spawn(move || {
+            let nimber = eval_for_worker.get_nimber(&game_cloned);
+            stop_for_worker.store(true, Ordering::Relaxed); // signal monitor to stop
+            nimber
+        });
+
+        // Monitor thread prints stats until stop flag is set
+        let monitor = thread::spawn(move || {
+            while !stop_for_monitor.load(Ordering::Relaxed) {
+                thread::sleep(Duration::from_millis(100));
+                let (stubs, processing, done) = eval_for_monitor.get_cache_stats();
+                print!(
+                    "\rstubs: {}, processing: {}, done: {}, total: {}",
+                    stubs,
+                    processing,
+                    done,
+                    stubs + processing + done
+                );
+                io::stdout().flush().unwrap();
+            }
+        });
+
+        let nimber = worker.join().unwrap();
+        monitor.join().unwrap();
+
+        println!("\nNimber: {}", nimber.unwrap_or(0));
+        nimber
+    }
+}
 /// Removes consecutive pairs of equal elements in a sorted list.
 /// Used to cancel out symmetric subgames when computing nimbers.
 fn remove_pairs<G>(vec: &mut Vec<G>)

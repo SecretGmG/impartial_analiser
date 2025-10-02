@@ -29,7 +29,7 @@ pub trait Impartial: Sized {
 
 impl<G> Default for Evaluator<G>
 where
-    G: Impartial + Hash + Eq + Clone + Ord,
+    G: Impartial + Hash + Eq + Clone,
 {
     fn default() -> Self {
         Self::new()
@@ -42,7 +42,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Evaluator<G>
 where
-    G: Impartial + Hash + Eq + Clone + Ord,
+    G: Impartial + Hash + Eq + Clone,
 {
     cache: Arc<DashMap<G, Entry<G>>>,
     pub cancel_flag: Arc<AtomicBool>,
@@ -50,7 +50,7 @@ where
 
 impl<G> Evaluator<G>
 where
-    G: Impartial + Hash + Eq + Clone + Ord,
+    G: Impartial + Hash + Eq + Clone,
 {
     /// Constructs a new, empty evaluator.
     pub fn new() -> Evaluator<G> {
@@ -305,9 +305,13 @@ where
 /// Used to cancel out symmetric subgames when computing nimbers.
 fn remove_pairs<G>(vec: &mut Vec<G>)
 where
-    G: Impartial + Ord,
+    G: Impartial + Hash + Eq,
 {
-    vec.sort();
+    vec.sort_by_cached_key(|m| {
+        let mut hasher = DefaultHasher::new();
+        m.hash(&mut hasher);
+        hasher.finish()
+    });
 
     let mut read = 0;
     let mut write = 0;

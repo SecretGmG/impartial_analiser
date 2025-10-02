@@ -17,7 +17,7 @@ use std::{io, thread};
 use crate::entry::{EntryData, ProcessingData};
 
 /// Provides the interface for evaluating an impartial game with the `Evaluator`.
-pub trait Impartial: Sized + Clone + Hash + Eq {
+pub trait Impartial: Sized {
     /// Returns the list of successor game states (i.e., possible moves).
     fn get_split_moves(&self) -> Vec<Vec<Self>>;
 
@@ -29,7 +29,7 @@ pub trait Impartial: Sized + Clone + Hash + Eq {
 
 impl<G> Default for Evaluator<G>
 where
-    G: Impartial,
+    G: Impartial + Hash + Eq + Clone + Ord,
 {
     fn default() -> Self {
         Self::new()
@@ -42,7 +42,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Evaluator<G>
 where
-    G: Impartial,
+    G: Impartial + Hash + Eq + Clone + Ord,
 {
     cache: Arc<DashMap<G, Entry<G>>>,
     pub cancel_flag: Arc<AtomicBool>,
@@ -50,7 +50,7 @@ where
 
 impl<G> Evaluator<G>
 where
-    G: Impartial,
+    G: Impartial + Hash + Eq + Clone + Ord,
 {
     /// Constructs a new, empty evaluator.
     pub fn new() -> Evaluator<G> {
@@ -259,7 +259,7 @@ where
 }
 impl<G> Evaluator<G>
 where
-    G: Impartial + Send + Sync + 'static,
+    G: Impartial + Hash + Eq + Clone + Ord + Send + Sync + 'static,
 {
     pub fn print_nimber_and_stats_of_game(&self, game: G) -> Option<usize> {
         self.print_nimber_and_stats_of_games(vec![game])
@@ -305,13 +305,9 @@ where
 /// Used to cancel out symmetric subgames when computing nimbers.
 fn remove_pairs<G>(vec: &mut Vec<G>)
 where
-    G: Impartial,
+    G: Impartial + Ord,
 {
-    vec.sort_by_cached_key(|m| {
-        let mut hasher = DefaultHasher::new();
-        m.hash(&mut hasher);
-        hasher.finish()
-    });
+    vec.sort();
 
     let mut read = 0;
     let mut write = 0;

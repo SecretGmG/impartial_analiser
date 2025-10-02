@@ -2,7 +2,7 @@ use crate::Impartial;
 
 const MAX_REMOVE: usize = 2;
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone, PartialOrd, Ord)]
 pub struct Kayles {
     pub kayles: usize,
 }
@@ -15,7 +15,7 @@ impl Impartial for Kayles {
     fn get_split_moves(&self) -> Vec<Vec<Kayles>> {
         let mut moves = vec![];
 
-        for i in 1..self.kayles.min(MAX_REMOVE) {
+        for i in 1..=self.kayles.min(MAX_REMOVE) {
             moves.push(vec![Kayles {
                 kayles: self.kayles - i,
             }]);
